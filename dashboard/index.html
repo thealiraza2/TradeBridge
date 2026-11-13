@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TradeBridge Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151d30;
+      --border: #243049;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Banners */
+    #live-warning-banner {
+      display: none;
+      background: #7f1d1d;
+      color: #fee2e2;
+      padding: 12px 20px;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid #ef4444;
+      animation: pulse 2s infinite;
+    }
+
+    #kill-switch-banner {
+      display: none;
+      background: #991b1b;
+      color: #fff;
+      padding: 14px 20px;
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      border-bottom: 3px solid #f87171;
+    }
+
+    /* Top Bar */
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 0.02em;
+    }
+
+    .brand-badge {
+      font-size: 0.75rem;
+      background: var(--border);
+      color: var(--text-muted);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pill {
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+    }
+
+    .pill-green {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    .pill-red {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .pill-mode {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-color: var(--border);
+    }
+
+    .btn-kill {
+      background: #334155;
+      color: #fff;
+      border: 1px solid #475569;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-kill.active {
+      background: var(--danger);
+      border-color: #f87171;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+    }
+
+    /* Layout */
+    main {
+      flex: 1;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #e2e8f0;
+    }
+
+    /* Settings Form */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .form-group input, .form-group select {
+      background: #0b0f19;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-save {
+      background: var(--primary);
+      color: #0b0f19;
+      border: none;
+      font-weight: 700;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-save:hover { opacity: 0.9; }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    th {
+      background: #0b0f19;
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .tag-buy { color: var(--success); font-weight: 700; }
+    .tag-sell { color: var(--danger); font-weight: 700; }
+    .profit-positive { color: var(--success); font-weight: 600; font-family: var(--font-mono); }
+    .profit-negative { color: var(--danger); font-weight: 600; font-family: var(--font-mono); }
+
+    /* Logs Terminal */
+    .log-viewer {
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Safety Warning Banners -->
+  <div id="live-warning-banner">
+    ⚠️ CAUTION: LIVE TRADING MODE IS ACTIVE — REAL CAPITAL AT RISK
+  </div>
+  <div id="kill-switch-banner">
+    🚨 EMERGENCY KILL SWITCH ACTIVE — ALL TRADINGWEBHOOKS ARE BLOCKED
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <span>TradeBridge</span>
+      <span class="brand-badge">v0.6.0</span>
+    </div>
+
+    <div class="top-actions">
+      <div id="status-mt5" class="pill pill-red">
+        <span class="dot">●</span> <span id="mt5-text">MT5 DISCONNECTED</span>
+      </div>
+      <div id="status-mode" class="pill pill-mode">
+        MODE: <span id="mode-text">DEMO</span>
+      </div>
+      <button id="kill-switch-btn" class="btn-kill" onclick="toggleKillSwitch()">
+        🛑 Kill Switch: OFF
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <!-- Settings Panel -->
+    <section class="card">
+      <div class="card-title">
+        <span>Trading & Risk Safety Controls</span>
+        <span id="save-status" style="font-size: 0.8rem; color: var(--success); font-weight: normal;"></span>
+      </div>
+      <form id="settings-form" onsubmit="saveSettings(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="default_risk_pct">Default Risk %</label>
+            <input type="number" id="default_risk_pct" step="0.1" min="0.1" max="5.0" required>
+          </div>
+          <div class="form-group">
+            <label for="default_max_lot">Max Lot Ceiling</label>
+            <input type="number" id="default_max_lot" step="0.01" min="0.01" required>
+          </div>
+          <div class="form-group">
+            <label for="max_positions">Max Open Positions</label>
+            <input type="number" id="max_positions" step="1" min="1" max="50" required>
+          </div>
+          <div class="form-group">
+            <label for="max_daily_loss_pct">Max Daily Loss %</label>
+            <input type="number" id="max_daily_loss_pct" step="0.1" min="0.5" max="20.0" required>
+          </div>
+        </div>
+        <button type="submit" class="btn-save">Save Settings</button>
+      </form>
+    </section>
+
+    <!-- Open Positions & Recent Alerts -->
+    <div class="grid-2">
+      <!-- Open Positions -->
+      <section class="card">
+        <div class="card-title">
+          <span>Active MT5 Positions</span>
+          <span id="positions-count" class="brand-badge">0 Open</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Symbol</th>
+                <th>Action</th>
+                <th>Volume</th>
+                <th>Open Price</th>
+                <th>SL</th>
+                <th>TP</th>
+                <th>Profit</th>
+              </tr>
+            </thead>
+            <tbody id="positions-tbody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No open positions</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Recent Alerts -->
+      <section class="card">
+        <div class="card-title">
+          <span>Recent Webhook Alerts</span>
+          <span id="alerts-count" class="brand-badge">0 Alerts</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Action</th>
+                <th>Lot</th>
+                <th>Status</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="alerts-tbody">
+              <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No alerts recorded yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Live Logs -->
+    <section class="card">
+      <div class="card-title">
+        <span>Execution Logs (Last 100 lines)</span>
+        <button onclick="fetchLogs()" style="background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Refresh</button>
+      </div>
+      <div id="log-viewer" class="log-viewer">Loading server logs...</div>
+    </section>
+  </main>
+
+  <script>
+    let killSwitchActive = false;
+
+    // Fetch Health & Status
+    async function fetchHealth() {
+      try {
+        const res = await fetch("/health");
+        const data = await res.json();
+        
+        // MT5 Status Pill
+        const mt5Pill = document.getElementById("status-mt5");
+        const mt5Text = document.getElementById("mt5-text");
+        if (data.mt5_connected) {
+          mt5Pill.className = "pill pill-green";
+          mt5Text.textContent = `MT5 CONNECTED (#${data.account || ""} - $${(data.balance || 0).toLocaleString()})`;
+        } else {
+          mt5Pill.className = "pill pill-red";
+          mt5Text.textContent = "MT5 DISCONNECTED";
+        }
+
+        // Kill Switch Status
+        killSwitchActive = Boolean(data.kill_switch);
+        updateKillSwitchUI(killSwitchActive);
+
+        // Mode Check
+        const modeText = document.getElementById("mode-text");
+        const mode = (data.mode || "demo").toUpperCase();
+        modeText.textContent = mode;
+        const liveBanner = document.getElementById("live-warning-banner");
+        liveBanner.style.display = mode === "LIVE" ? "block" : "none";
+      } catch (err) {
+        console.error("Health fetch error:", err);
+      }
+    }
+
+    function updateKillSwitchUI(active) {
+      const btn = document.getElementById("kill-switch-btn");
+      const banner = document.getElementById("kill-switch-banner");
+      if (active) {
+        btn.className = "btn-kill active";
+        btn.textContent = "🚨 Kill Switch: ON";
+        banner.style.display = "block";
+      } else {
+        btn.className = "btn-kill";
+        btn.textContent = "🛑 Kill Switch: OFF";
+        banner.style.display = "none";
+      }
+    }
+
+    async function toggleKillSwitch() {
+      const newState = !killSwitchActive;
+      try {
+        const res = await fetch("/kill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kill: newState })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          killSwitchActive = Boolean(data.kill_switch);
+          updateKillSwitchUI(killSwitchActive);
+        }
+      } catch (err) {
+        alert("Failed to toggle kill switch: " + err.message);
+      }
+    }
+
+    // Load Settings
+    async function fetchSettings() {
+      try {
+        const res = await fetch("/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings) {
+            document.getElementById("default_risk_pct").value = data.settings.default_risk_pct || 1.0;
+            document.getElementById("default_max_lot").value = data.settings.default_max_lot || 2.0;
+            document.getElementById("max_positions").value = data.settings.max_positions || 5;
+            document.getElementById("max_daily_loss_pct").value = data.settings.max_daily_loss_pct || 3.0;
+          }
+        }
+      } catch (err) {
+        console.error("Settings load error:", err);
+      }
+    }
+
+    async function saveSettings(e) {
+      e.preventDefault();
+      const payload = {
+        default_risk_pct: parseFloat(document.getElementById("default_risk_pct").value),
+        default_max_lot: parseFloat(document.getElementById("default_max_lot").value),
+        max_positions: parseInt(document.getElementById("max_positions").value, 10),
+        max_daily_loss_pct: parseFloat(document.getElementById("max_daily_loss_pct").value)
+      };
+
+      try {
+        const res = await fetch("/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        const statusEl = document.getElementById("save-status");
+        if (data.status === "ok") {
+          statusEl.textContent = "Settings saved successfully!";
+          setTimeout(() => { statusEl.textContent = ""; }, 3000);
+        } else {
+          statusEl.style.color = "var(--danger)";
+          statusEl.textContent = "Error saving settings: " + (data.reason || "unknown");
+        }
+      } catch (err) {
+        alert("Error saving settings: " + err.message);
+      }
+    }
+
+    // Open Positions
+    async function fetchPositions() {
+      try {
+        const res = await fetch("/positions");
+        const data = await res.json();
+        const tbody = document.getElementById("positions-tbody");
+        const countBadge = document.getElementById("positions-count");
+
+        if (data.status === "ok" && Array.isArray(data.positions) && data.positions.length > 0) {
+          countBadge.textContent = `${data.positions.length} Open`;
+          tbody.innerHTML = data.positions.map(p => `
+            <tr>
+              <td style="font-family: var(--font-mono);">${p.ticket}</td>
+              <td style="font-weight: 600;">${p.symbol}</td>
+              <td class="${p.type === 'BUY' ? 'tag-buy' : 'tag-sell'}">${p.type}</td>
+              <td style="font-family: var(--font-mono);">${Number(p.volume).toFixed(2)}</td>
+              <td style="font-family: var(--font-mono);">${Number(p.open_price).toFixed(p.open_price > 100 ? 2 : 5)}</td>
+              <td style="font-family: var(--font-mono);">${Number(p.sl).toFixed(p.sl > 100 ? 2 : 5)}</td>
+              <td style="font-family: var(--font-mono);">${Number(p.tp).toFixed(p.tp > 100 ? 2 : 5)}</td>
+              <td class="${p.profit >= 0 ? 'profit-positive' : 'profit-negative'}">${p.profit >= 0 ? '+' : ''}${Number(p.profit).toFixed(2)}</td>
+            </tr>
+          `).join('');
+        } else {
+          countBadge.textContent = "0 Open";
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No open positions</td></tr>';
+        }
+      } catch (err) {
+        console.error("Positions fetch error:", err);
+      }
+    }
+
+    // Recent Alerts
+    async function fetchAlerts() {
+      try {
+        const res = await fetch("/alerts");
+        if (res.ok) {
+          const data = await res.json();
+          const tbody = document.getElementById("alerts-tbody");
+          const countBadge = document.getElementById("alerts-count");
+
+          if (data.status === "ok" && Array.isArray(data.alerts) && data.alerts.length > 0) {
+            countBadge.textContent = `${data.alerts.length} Alerts`;
+            tbody.innerHTML = data.alerts.slice(-10).reverse().map(a => `
+              <tr>
+                <td style="color: var(--text-muted); font-size: 0.8rem;">${a.time || ""}</td>
+                <td style="font-weight: 600;">${a.symbol || ""}</td>
+                <td class="${a.action === 'BUY' ? 'tag-buy' : 'tag-sell'}">${a.action || ""}</td>
+                <td style="font-family: var(--font-mono);">${a.lot ? Number(a.lot).toFixed(2) : "-"}</td>
+                <td>
+                  <span class="pill ${a.status === 'executed' ? 'pill-green' : 'pill-red'}" style="padding: 2px 8px; font-size: 0.75rem; display: inline-block;">
+                    ${(a.status || "").toUpperCase()}
+                  </span>
+                </td>
+                <td style="color: var(--text-muted);">${a.status === 'executed' ? 'Ticket: #' + a.ticket : (a.reason || "")}</td>
+              </tr>
+            `).join('');
+          }
+        }
+      } catch (err) {
+        console.error("Alerts fetch error:", err);
+      }
+    }
+
+    // Logs
+    async function fetchLogs() {
+      try {
+        const res = await fetch("/logs");
+        const data = await res.json();
+        const viewer = document.getElementById("log-viewer");
+        if (data.status === "ok" && Array.isArray(data.lines)) {
+          viewer.textContent = data.lines.join('\n');
+          viewer.scrollTop = viewer.scrollHeight;
+        }
+      } catch (err) {
+        console.error("Logs fetch error:", err);
+      }
+    }
+
+    // Initial Load & Intervals
+    fetchHealth();
+    fetchSettings();
+    fetchPositions();
+    fetchAlerts();
+    fetchLogs();
+
+    setInterval(fetchHealth, 5000);
+    setInterval(fetchPositions, 5000);
+    setInterval(fetchAlerts, 5000);
+    setInterval(fetchLogs, 5000);
+  </script>
+</body>
+</html>

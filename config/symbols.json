@@ -1,0 +1,18 @@
+{
+  "symbols": {
+    "XAUUSD": { "tick_value_per_unit": 100.0, "min_lot": 0.01, "max_lot": 2.0, "step": 0.01, "pip_size": 0.01 },
+    "EURUSD": { "tick_value_per_unit": 10.0, "min_lot": 0.01, "max_lot": 2.0, "step": 0.01, "pip_size": 0.0001 },
+    "GBPUSD": { "tick_value_per_unit": 10.0, "min_lot": 0.01, "max_lot": 2.0, "step": 0.01, "pip_size": 0.0001 },
+    "USDJPY": { "tick_value_per_unit": 10.0, "min_lot": 0.01, "max_lot": 2.0, "step": 0.01, "pip_size": 0.01 }
+  },
+  "tv_to_mt5": {
+    "OANDA:XAUUSD": "XAUUSD",
+    "GOLD": "XAUUSD"
+  },
+  "whitelist": [
+    "XAUUSD",
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY"
+  ]
+}

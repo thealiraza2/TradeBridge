@@ -1,0 +1,7 @@
+.env
+logs/
+__pycache__/
+.venv/
+*.log
+.pytest_cache/
+config/runtime_settings.json

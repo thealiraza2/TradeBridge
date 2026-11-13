@@ -1,0 +1,133 @@
+//@version=5
+// ==============================================================================
+// TradeBridge Sender — TradingView to MetaTrader 5 Execution Bridge
+// ==============================================================================
+// SETUP GUIDE:
+// 1. Add this indicator to your TradingView chart (e.g. XAUUSD, EURUSD).
+// 2. Open indicator settings and enter your Webhook Secret (from .env).
+// 3. Create an alert:
+//    - Condition: "TradeBridge Sender" -> Any alert() function call (or select BUY/SELL condition)
+//    - Webhook URL: Check "Webhook URL" and paste your server URL (e.g. http://YOUR_IP:8000/webhook)
+//    - Message: If using alertcondition, paste the JSON format below into the message box.
+//               If using dynamic alert(), leave message as {{strategy.order.alert_message}} or default.
+// 4. IMPORTANT: The secret in TradingView MUST match the WEBHOOK_SECRET in your .env,
+//    otherwise the TradeBridge server will reject the alert with HTTP 400.
+//
+// EXPECTED JSON FORMAT:
+// {"secret": "YOUR_SECRET_HERE", "action": "BUY", "symbol": "XAUUSD", "entry": 3890.50, "sl": 3880.50, "tp": 3910.50, "risk_pct": 1.0, "max_lot": 2.0, "alert_id": "unique-id", "comment": "TradeBridge-GOLD-LONG"}
+// ==============================================================================
+
+indicator("TradeBridge Sender", overlay = true, format = format.price)
+
+// ------------------------------------------------------------------------------
+// User Inputs
+// ------------------------------------------------------------------------------
+groupRisk = "Risk & Sizing Defaults"
+riskPct        = input.float(1.0, "Risk % (0.1 - 5.0)", minval = 0.1, maxval = 5.0, step = 0.1, group = groupRisk)
+maxLot         = input.float(2.0, "Max Lot Ceiling", minval = 0.01, step = 0.01, group = groupRisk)
+webhookSecret  = input.string("", "Webhook Secret (must match .env)", group = groupRisk)
+
+groupExec = "Execution Controls"
+useLong        = input.bool(true, "Allow BUY Alerts", group = groupExec)
+useShort       = input.bool(true, "Allow SELL Alerts", group = groupExec)
+useExampleEmaTrigger = input.bool(false, "EXAMPLE trigger: EMA 9/21 crossover (OFF by default — enable only to test the alert flow)", group = groupExec)
+
+groupLevels = "Stop Loss & Take Profit Settings"
+levelMode      = input.string("ATR Multiple", "Level Calculation", options = ["ATR Multiple", "Fixed Distance", "Manual"], group = groupLevels)
+atrLength      = input.int(14, "ATR Length", minval = 1, group = groupLevels)
+atrSlMult      = input.float(1.5, "ATR SL Multiplier", minval = 0.1, step = 0.1, group = groupLevels)
+fixedDistance  = input.float(2.0, "Fixed SL Distance (Price Units)", minval = 0.0001, group = groupLevels)
+rrRatio        = input.float(2.0, "Risk / Reward Ratio (TP = SL * RR)", minval = 0.5, step = 0.5, group = groupLevels)
+
+// Manual price overrides (only used when levelMode == "Manual")
+manualEntry    = input.float(0.0, "Manual Entry Price", minval = 0.0, group = groupLevels)
+manualSl       = input.float(0.0, "Manual Stop Loss", minval = 0.0, group = groupLevels)
+manualTp       = input.float(0.0, "Manual Take Profit", minval = 0.0, group = groupLevels)
+
+// ------------------------------------------------------------------------------
+// Level Calculations
+// ------------------------------------------------------------------------------
+atrValue = ta.atr(atrLength)
+
+float slDist = na
+if levelMode == "ATR Multiple"
+    slDist := atrValue * atrSlMult
+else if levelMode == "Fixed Distance"
+    slDist := fixedDistance
+else
+    slDist := math.abs(manualEntry - manualSl)
+
+// Compute dynamic long and short levels
+longEntry  = levelMode == "Manual" and manualEntry > 0 ? manualEntry : close
+longSl     = levelMode == "Manual" and manualSl > 0    ? manualSl    : longEntry - slDist
+longTp     = levelMode == "Manual" and manualTp > 0    ? manualTp    : longEntry + (slDist * rrRatio)
+
+shortEntry = levelMode == "Manual" and manualEntry > 0 ? manualEntry : close
+shortSl    = levelMode == "Manual" and manualSl > 0    ? manualSl    : shortEntry + slDist
+shortTp    = levelMode == "Manual" and manualTp > 0    ? manualTp    : shortEntry - (slDist * rrRatio)
+
+// ------------------------------------------------------------------------------
+// Chart Visuals (Draw Entry, SL, and TP lines)
+// ------------------------------------------------------------------------------
+plot(longEntry, "BUY Entry", color = color.new(color.blue, 30), style = plot.style_linebr)
+plot(longSl,    "BUY Stop Loss", color = color.new(color.red, 30), style = plot.style_linebr)
+plot(longTp,    "BUY Take Profit", color = color.new(color.green, 30), style = plot.style_linebr)
+
+plot(shortSl,   "SELL Stop Loss", color = color.new(color.maroon, 40), style = plot.style_circles)
+plot(shortTp,   "SELL Take Profit", color = color.new(color.teal, 40), style = plot.style_circles)
+
+// ------------------------------------------------------------------------------
+// Unique Alert ID & JSON Formatter
+// ------------------------------------------------------------------------------
+var int alertCounter = 0
+
+f_build_json(string action, float entryVal, float slVal, float tpVal) =>
+    alertCounter += 1
+    string alertId = str.tostring(time) + "-" + str.tostring(alertCounter)
+    string commentText = "TradeBridge-" + syminfo.ticker + "-" + action
+    
+    // Exact JSON string with no missing and no extra fields
+    string payload = '{"secret": "' + webhookSecret + '", ' +
+                     '"action": "' + action + '", ' +
+                     '"symbol": "' + syminfo.ticker + '", ' +
+                     '"entry": ' + str.tostring(entryVal, "#.#####") + ', ' +
+                     '"sl": ' + str.tostring(slVal, "#.#####") + ', ' +
+                     '"tp": ' + str.tostring(tpVal, "#.#####") + ', ' +
+                     '"risk_pct": ' + str.tostring(riskPct, "#.#") + ', ' +
+                     '"max_lot": ' + str.tostring(maxLot, "#.##") + ', ' +
+                     '"alert_id": "' + alertId + '", ' +
+                     '"comment": "' + commentText + '"}'
+    payload
+
+// ------------------------------------------------------------------------------
+// Signal Trigger Logic (OPTIONAL EXAMPLE — EMA Crossover, OFF by default)
+// ------------------------------------------------------------------------------
+// TradeBridge is execution-only: it sends whatever trigger YOU enable.
+// This EMA 9/21 crossover is only an example so you can test the alert flow.
+// Leave useExampleEmaTrigger OFF and use your own levels, a manual alert,
+// or your own strategy instead. Never trade a built-in example trigger blindly.
+fastEma = ta.ema(close, 9)
+slowEma = ta.ema(close, 21)
+
+bool buySignal  = useExampleEmaTrigger and ta.crossover(fastEma, slowEma) and useLong
+bool sellSignal = useExampleEmaTrigger and ta.crossunder(fastEma, slowEma) and useShort
+
+plotshape(buySignal,  "BUY Signal",  shape.triangleup,   location.belowbar, color.green, size = size.small)
+plotshape(sellSignal, "SELL Signal", shape.triangledown, location.abovebar, color.red,   size = size.small)
+
+// ------------------------------------------------------------------------------
+// Dynamic Alerts (Fires JSON Payload)
+// ------------------------------------------------------------------------------
+if buySignal
+    string buyPayload = f_build_json("BUY", longEntry, longSl, longTp)
+    alert(buyPayload, alert.freq_once_per_bar_close)
+
+if sellSignal
+    string sellPayload = f_build_json("SELL", shortEntry, shortSl, shortTp)
+    alert(sellPayload, alert.freq_once_per_bar_close)
+
+// ------------------------------------------------------------------------------
+// Static Alertconditions (For manual TradingView alert creation dialog)
+// ------------------------------------------------------------------------------
+alertcondition(buySignal,  "TradeBridge BUY",  "TradeBridge BUY Signal Triggered")
+alertcondition(sellSignal, "TradeBridge SELL", "TradeBridge SELL Signal Triggered")
